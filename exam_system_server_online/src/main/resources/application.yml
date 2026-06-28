@@ -60,7 +60,7 @@ minio:
 kimi:
   api:
     base-url: "https://api.moonshot.cn/v1/chat/completions"
-    api-key: sk-squaYqr8jPr05nw3BajbiCzHID7t1PbPDISDv2GBDPmE1oxn   # 从环境变量获取，或使用默认值
+    api-key: ${KIMI_API_KEY:}   # 从环境变量 KIMI_API_KEY 获取
     model: moonshot-v1-32k  # 使用8k上下文模型进行判卷
     max-tokens: 4096  # 最大生成token数
     temperature: 0.3  # 较低的temperature确保判卷结果稳定
