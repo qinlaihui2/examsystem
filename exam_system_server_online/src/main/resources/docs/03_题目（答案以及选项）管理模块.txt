@@ -1,0 +1,207 @@
+1.获取分页查询题目列表（GET /api/questions/list）详情接口
+  接口分析：
+     参数：支持按分类、难度、题型、关键词进行多条件筛选的分页查询
+     响应：
+       {
+           "code": 200,
+           "message": "操作成功",
+           "data": {
+               "records": [
+                   {
+                       "id": 63,
+                       "title": "以下哪些SQL语句是合法的？",
+                       "type": "CHOICE",
+                       "multi": true,
+                       "categoryId": 16,
+                       "difficulty": "MEDIUM",
+                       "score": 5,
+                       "analysis": "前两个选项中的SQL语句均是合法的，分别用于查询、更新数据。第三个选项中的SQL语句'DELETE FROM users WHERE name = 'John' OR delete_flag = 1'是非法的，因为DELETE语句不支持条件中的OR逻辑。最后一个选项中的INSERT语句是合法的，用于插入数据。",
+                       "createTime": "2025-07-18T10:59:04",
+                       "updateTime": "2025-07-18T10:59:04",
+                       "choices": [
+                           {
+                               "id": 54,
+                               "questionId": 63,
+                               "content": "SELECT * FROM users WHERE email LIKE '%@example.com'",
+                               "isCorrect": true,
+                               "sort": 1
+                           },
+                           {
+                               "id": 55,
+                               "questionId": 63,
+                               "content": "UPDATE users SET age = age + 1 WHERE id = 1",
+                               "isCorrect": true,
+                               "sort": 2
+                           },
+                           {
+                               "id": 56,
+                               "questionId": 63,
+                               "content": "DELETE FROM users WHERE name = 'John' OR delete_flag = 1",
+                               "isCorrect": false,
+                               "sort": 3
+                           },
+                           {
+                               "id": 57,
+                               "questionId": 63,
+                               "content": "INSERT INTO users (name, email) VALUES ('Jane', 'jane@example.com')",
+                               "isCorrect": true,
+                               "sort": 4
+                           }
+                       ],
+                       "answer": {
+                           "id": 57,
+                           "questionId": 63,
+                           "answer": "A,B,D"
+                       }
+                   },
+                   {
+                       "id": 59,
+                       "title": "Spring框架的@Component注解可以用来标识一个普通的类作为Spring容器管理的Bean。",
+                       "type": "JUDGE",
+                       "multi": false,
+                       "categoryId": 21,
+                       "difficulty": "MEDIUM",
+                       "score": 5,
+                       "analysis": "这个陈述是正确的。Spring框架中的@Component注解被用来标识一个普通的类成为Spring容器的Bean。它是一个泛化的形式，可以被更具体的注解如@Service、@Controller、@Repository等替代，这些注解都间接继承自@Component。",
+                       "createTime": "2025-07-09T17:51:22",
+                       "updateTime": "2025-07-09T17:51:22",
+                       "answer": {
+                           "id": 53,
+                           "questionId": 59,
+                           "answer": "TRUE"
+                       }
+                   },
+                   {
+                       "id": 54,
+                       "title": "Spring MVC框架中的DispatcherServlet是用来负责接收所有的客户端请求。",
+                       "type": "JUDGE",
+                       "multi": false,
+                       "categoryId": 21,
+                       "difficulty": "MEDIUM",
+                       "score": 5,
+                       "analysis": "在Spring MVC框架中，DispatcherServlet是前端控制器，它负责接收所有的请求然后决定请求应该发送到哪个处理器上，因此这个陈述是正确的。",
+                       "createTime": "2025-07-09T17:51:22",
+                       "updateTime": "2025-07-09T17:51:22",
+                       "answer": {
+                           "id": 48,
+                           "questionId": 54,
+                           "answer": "TRUE"
+                       }
+                   },
+                   {
+                       "id": 39,
+                       "title": "Spring MVC在SSM框架中扮演什么角色？",
+                       "type": "TEXT",
+                       "multi": false,
+                       "categoryId": 24,
+                       "difficulty": "MEDIUM",
+                       "score": 5,
+                       "analysis": "Spring MVC框架在SSM中作为模型（Model）、视图（View）和控制器（Controller）的中介，它处理用户的HTTP请求，并返回响应，是实现Web应用的核心组件之一。",
+                       "createTime": "2025-06-25T09:08:54",
+                       "updateTime": "2025-06-25T09:08:54",
+                       "answer": {
+                           "id": 33,
+                           "questionId": 39,
+                           "answer": "Spring MVC负责处理Web应用中的请求和响应，实现Web层的MVC模式，提供路由、分发、数据绑定等功能。"
+                       }
+                   }
+               ],
+               "total": 44,
+               "size": 10,
+               "current": 1,
+               "orders": [],
+               "optimizeCountSql": true,
+               "searchCount": true,
+               "pages": 5
+           }
+       }
+  业务分析：1.嵌套结果查询（但是这里是一对多，mybatisplus的分页插件不能使用，所以这个方法行不通
+          2.分布查询（嵌套查询）1.先查题目以及对应的答案，因为这俩是一对一，然后顺便加入Page 2.再根据题目去查对应的选项
+          3.java代码处理（不用在mapper.xml里面写各种条件，考察stream流的使用，filter(过滤条件) gropBy() collect(结果转换)）
+            1.题目单表的分页查询+动态条件查询 lamdaQueryWrapper筛选
+            2.查询题目对应的所有选项和所有的答案
+            3.题目的选项和答案集合作为map的Value 题目id作为key
+            4.循环map列表去除所有的选项以及答案
+
+          2.1.先写sql语句，最后调整其返回结果类型
+             #第一步查询题目和题目的答案(一对一的关系)
+             #改questionAnswer的id,以及其他与question同名的属性
+             select qs.*,
+                    qa.id qa_id,
+             			 qa.create_time qa_create_time,
+             			 qa.update_time qa_update_time,
+             			 qa.is_deleted qa_is_deleted
+              from questions qs join question_answers qa on qs.id=qa.question_id
+                    WHERE qa.is_deleted=0 and qs.is_deleted=0 ORDER BY qs.create_time DESC
+             #第二步查询题目对应的选项集合
+             select *  from question_choices WHERE question_id=71 and is_deleted=0 ORDER BY sort ASC;
+          2.2.第二步比较简单所以中间通过@SELECT("第二步")
+          第一步的返回结果一定要是PAge<Question>
+          先写quetionssql语句
+              select qs.*,
+                     qa.id qa_id,
+                     qa.id,
+                     qa.keywords,
+                     qa.create_time qa_create_time,
+                     qa.update_time qa_update_time,
+                     qa.is_deleted qa_is_deleted
+                     from questions qs join question_answers qa on qs.id=qa.question_id
+                     WHERE qa.is_deleted=0 and qs.is_deleted=0
+                     <if test="queryVo.type != null and queryVo.type != ''">
+                         and qs.type = #{queryVo.type}
+                     </if>
+                     <if test="queryVo.difficulty != null and queryVo.difficulty != ''">
+                         and qs.difficulty = #{queryVo.difficulty}
+                     </if>
+                     <if test="queryVo.categoryId != null">
+                         and qs.category_id = #{queryVo.categoryId}
+                     </if>
+                     <if test="queryVo.keyword != null and queryVo.keyword != ''">
+                         and title like concat('%',#{queryVo.keyword},'%')
+                     </if>
+                     order by qs.create_time desc
+              加<if>筛选属性
+              格式 <if test"属性名"+条件>
+  实现过程：
+  //第0步先配置分页插件
+      @Bean
+      public MybatisPlusInterceptor plusInterceptor(){
+
+          MybatisPlusInterceptor interceptor = new MybatisPlusInterceptor();
+          interceptor.addInnerInterceptor(new PaginationInnerInterceptor(DbType.MYSQL));
+          return interceptor;
+      }
+  注意事项：返回结果并不是quetion而是questionList+questionChoice所以resultMap={
+      <!--第一层 question的属性-->
+              <id column="id" property="id"></id>//主键属性
+              #非主键属性列，可以省略，但是如果有嵌套查询既需要开启自动深层次映射full
+              #对一答案
+              <association property="answer" javaType="com.atguigu.exam.entity.QuestionAnswer">
+                  <id column="qa_id" property="id" />
+                  #省略了question_id answer keywords
+                  <result column="qa_create_time" property="createTime" />
+                  <result column="qa_update_time" property="updateTime" />
+                  <result column="qa_is_deleted" property="isDeleted"/>
+              </association>
+              <!--
+              对多：选项 分布查询，触发第二次查询
+              column ->向下传递的列（当前查询中，向下传递的列名）
+              select -> 触发的第二次查询mapper的全限定符方法名
+              -->
+              <collection property="choices" ofType="com.atguigu.exam.entity.QuestionChoice"
+                          column="id" select="com.atguigu.exam.mapper.QuestionChoiceMapper.selectListByQuestionId" />
+  }
+
+
+2.整合redis
+  1.检查redis是否启动
+  2.项目集成redis环境（场景启动器1.导入启动器 2.设置必要参数 2.直接使用）
+    data:
+      redis:
+        host: 192.168.100.104
+        port: 6379
+        reids进行序列化配置（默认是jdk虚化器-》[key-字符串 | value->json]redis）
+
+  3.导入redis工具类
+  4.封装一个进行热门排行榜添加的方法
+  5.题目详情开启线程，调用热门排行榜方法

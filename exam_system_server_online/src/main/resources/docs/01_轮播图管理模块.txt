@@ -1,0 +1,261 @@
+1.查询所有轮播图列表接口
+  接口分析：
+     参数：无
+     响应：
+     {
+     	"code": 200,
+     	"message": "操作成功",
+     	"data": [  -》将所有的轮播图，放在data里面
+     		{
+     			"id": 1,
+     			"title": "智能考试系统介绍",
+     			"description": "基于AI技术的智能考试平台，支持在线考试、智能组卷等功能",
+     			"imageUrl": "https://example.com/images/banner1.jpg",
+     			"linkUrl": "https://example.com/about",
+     			"sortOrder": 1,
+     			"isActive": true,
+     			"createTime": ""
+     		}
+     	]
+     }
+  业务分析：
+     单表的全部查询，直接使用mapper或者service(mybatis-plus自带的）
+     直接在controller里面查询就行
+  实现过程：
+     1.查询所有的轮播图取数据集合（service业务层方法）
+     2.将集合装入result
+     日志输出info->输出本次查询结果
+     3.返回结果
+  注意事项：
+     1.集成了@SLf4+log.info输出
+     2.没有根据sortOrder字段正确排序
+         //todo:解决没有排序的问题
+         LambdaQueryWrapper<Banner> lambdaQueryWrapper=new LambdaQueryWrapper<>();
+         lambdaQueryWrapper.orderByAsc(Banner::getSortOrder);//小到大
+         List<Banner> list = bannerService.list(lambdaQueryWrapper);
+      3.部分不需要查出来的字段页返回了。比如updateTime isDeleted
+        因为返回的json数据是有实体类转化的，所有默认的数据都返回是正常的
+        如果需要忽略某些数据需要配置@JsonIgnore
+                              private int isDeleted
+      4.时间格式不对，并且时间页对不上查出来的少了8小时
+         jackson第三方包，转换的时间
+         总结：设置时间格式，jackson
+         法1：不推荐,时间属性添加注解
+         @JsonFormat(pattern = "yyyy-mm-dd HH:mm:ss",timezone = "GMT+8")
+         法2：全局配置
+         application使用固定的key配置时间和时区
+             spring:
+               jackson:
+                 date-format: yyyy-MM-dd HH:mm:ss
+                 time-zone: GMT+8
+      5.逻辑删除的数据也被查出来了
+         全局配置
+         mybatis-plus:
+           global-config:
+             db-config:
+               logic-delete-field: isDeleted # 全局逻辑删除的实体属性名(配置后可以忽略不配置步骤二)
+               logic-delete-value: 1 # 逻辑已删除值(默认为 1)
+               logic-not-delete-value: 0 # 逻辑未删除值(默认为 0)
+
+2.查询激活轮播图列表接口
+  接口分析：
+     参数：无
+     响应：
+     {
+     	"code": 200,
+     	"message": "操作成功",
+     	"data": [
+     		{
+     			"id": 1,
+     			"title": "智能考试系统介绍",
+     			"description": "基于AI技术的智能考试平台，支持在线考试、智能组卷等功能",
+     			"imageUrl": "https://example.com/images/banner1.jpg",
+     			"linkUrl": "https://example.com/about",
+     			"sortOrder": 1,
+     			"isActive": true,
+     			"createTime": ""
+     		}
+     	]
+     }
+  业务分析：前台需要的轮播图数据结构
+  查询逻辑：激活
+  实现过程：
+     1.拼接查询条件
+     2查询
+     3装入result
+  注意事项：无
+
+3.切换轮播图状态接口
+  接口分析：
+     参数：path->id
+          query->isActive=激活状态
+     响应：
+        {
+           code:200
+           message:操作成功
+           data:null
+        }
+  业务分析：
+     就是轮播图状态切换
+     启动状态，前台可以查到
+  实现过程：
+     1.创建UpdateWrapper
+     2.调用业务层修改方法update
+     3.返回输出结果，result.success(null)
+  注意事项：
+
+4.删除轮播图信息接口
+  接口分析：
+     参数：path->id
+     响应：
+      {
+                code:200
+                message:操作成功
+                data:null
+      }
+  业务分析：根据id删除轮播图
+  实现过程：直接调用service或者mapper(remove deleted)
+  1.防御性编程，删除会影响数据的展示和丢失问题（不能真删除）
+  2.有没有重要的关联数据，导致你无法被删除
+      例子：我有一个梦想我想去峨眉山出家，当和尚！！！-》如果我一个人-》我去不了 因为-》我还有放不下的东西还有未完成的任务
+      例如：试卷表-》题目表（删除题目表，如果有试卷引用题目，我们就不能删除
+  3.删除的同时还需要删除其子数据
+      题目表-》选线表
+           -》答案表
+      删除题目-》删除题目的选项和答案
+  注意事项：
+
+5.获取轮播图详情接口
+  接口分析：
+     参数：path->id
+     响应：
+    {
+    轮播图对象的json信息
+    }
+  业务分析：直接调用getById
+  实现过程：返回result
+  注意事项：轮播图id可能存在已删除的情况.返回result.error(null)
+
+6 实现通用文件上传业务
+  业务分析：
+     单独进行文件上传的业务方法
+     方法（file,folder)
+     返回文件回显地址即可
+  实现过程：
+     将minio整合到核心容器中（复用minioClient对象）
+     回顾：springboot（优势简化配置（application.yml)简化开发(自动配置原理)，简化整合（场景启动器）））
+     springboot整合第三方技术
+        方案1：1.导入场景启动器 2.设置相关的配置参数 3使用核心组件
+        方案2：1.导入普通依赖2.定义接受配置参数properties3.在application.yml定义相关参数（key->properties)
+        4.定义配置类（将核心组件加入到ioc容器）5.使用核心组件
+     1.1导入minio依赖
+     1.2定义peoperties类接受minio的参数【endPoint,accessKey,secretKey,bucketName】
+     @Data
+     @Component
+     @ConfigurationProperties(prefix = "minio")
+     public class MinioProterties {
+
+
+         private String endPoint;
+         private String accessKey;
+         private String secretKey;
+         private String bucket;
+     }
+     1.3去application.yml声明我们自己需要的参数(软编码）【代码的参数写道配置类文件中】
+     minio:
+       end-point: http://192.168.100.104:9000
+       access-key: minioadmin
+       secret-key: minioadmin
+       bucket-name: onlinebucket
+     1.4定义Minio配置类（minioClient加入到核心容器ioc中）
+     @Slf4j
+     @Configuration
+     public class MinioConfiguration {
+
+         @Autowired
+         private MinioProterties minioProterties;
+
+         @Bean
+         public MinioClient minioClient() {
+             MinioClient minioClient = MinioClient.builder().endpoint(minioProterties.getEndPoint())
+                     .credentials(minioProterties.getAccessKey(), minioProterties.getSecretKey()).build();
+             log.info("minio文件服务器连接成功,连接对象信息为{}", minioClient);
+             return minioClient;
+         }
+     }
+  小细节；Properties读取配置参数，加入核心容器的方案
+       @Compent
+     编写minio文件上传业务file,folder
+  注意事项：
+     文件覆盖和重复的问题（文件名重复会导致之前的文件被覆盖）
+     设计不同的对象名称UUID-》生成一个随机不同的字符串-》UUID_文件名
+     我们没有主动抛出异常，没有设计全局异常处理x
+     springMVC全局异常处理器@ControllerAdvice @RestControllerAdvice
+     异常处理流程 1.捕捉全局异常 2.收集异常处理信息 3.给客户友好反馈
+        @Slf4j
+        @RestControllerAdvice//全局异常都在这里处理
+        public class GlobalExceptionHandler {
+
+
+            @ExceptionHandler(Exception.class)
+            public Result exceptionHandler(Exception e) {
+                //打印日志
+                e.printStackTrace();//错误的堆栈信息先打印
+                log.error("代码出现异常，详细信息为{}",e.getMessage());
+                return Result.error(e.getMessage());
+            }
+        }
+7 上传轮播图图接口
+  接口分析：
+     参数：
+     {
+        "code":200
+        "message":"操作成功"
+        "data":"imgurl访问地址"
+     }
+     响应：
+  业务分析：
+     调用文件上传接口
+     文件非空校验
+     文件类型 image
+     调用文件上传业务
+     回显地址
+  实现过程：
+       1.文件非空校验
+       2.文件类型 image
+       3.调用文件上传业务
+       4.回显地址
+  注意事项：
+     问价大小限制
+     大小最大为1MB
+     如何自定义限制
+
+
+  8保存轮播图图接口
+  接口分析：
+     参数：
+     响应{
+       	"code": 200,
+       	"message": "操作成功",
+       	"data": ""
+       }
+  业务分析：
+  单表的save直接调用service方法继续service,saveOrUpdate
+  实现过程：
+  注意事项：5
+
+轮播图模块总结
+   业务思路
+      单表crud
+      删除业务-》防御性编程1.逻辑删除 2，检查是否被其他重要数据引用 3.删除以后，删除自己的子数据
+      文件上传-》轮播图 | 视频文件等等 -》校验逻辑不同 -》 文件上传提取业务 -》 file folder
+   技术扩展：
+      1.快速继承日志@Slf4j
+      2.逻辑删除配置（全局|局部）
+      3.@jsonIgnore
+      4.时间属性格式化GTM+8
+      5.updateWrapper
+      6.删除防御性编程
+      7.minio导入步骤（1.导入依赖 2.定义读取preperties 声明application.yml 4. 创建自己的配置类5.使用核心组件
+      8.文件大小上传现在1Mb-10Mb
+      9.全局异常处理

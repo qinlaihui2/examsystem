@@ -1,0 +1,13 @@
+spring:
+  datasource:
+    driver-class-name: com.mysql.cj.jdbc.Driver
+    username: root
+    password: 2005Ljy.123
+    url: jdbc:mysql://192.168.100.104:3306/hello_mp?useUnicode=true&characterEncoding=utf-8&serverTimezone=GMT%2b8
+
+mybatis-plus:
+  global-config:
+    db-config:
+      logic-delete-field: deleted #属性名(更正此处为属性名)
+      logic-delete-value: 1 # 逻辑已删除值(默认为 1)
+      logic-not-delete-value: 0 # 逻辑未删除值(默认为 0)
